@@ -11,6 +11,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from database import DB_PATH, CSV_PATH, get_connection
 from models import LookupResponse
 
+# --------------------------------
+# APP INIT
+# --------------------------------
 app = FastAPI(title="SP Health Caller ID API", version="1.0.0")
 
 app.add_middleware(
@@ -21,13 +24,13 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# 🔥 DEBUG (importante para Render logs)
+# DEBUG LOGS (Render)
 print("🚀 STARTING APP")
 print("FILES IN DIR:", os.listdir())
 
-# -------------------------------
+# --------------------------------
 # PHONE NORMALIZATION
-# -------------------------------
+# --------------------------------
 def normalize_phone(phone: str) -> str:
     digits = re.sub(r"\D+", "", phone or "")
     if not digits:
@@ -39,21 +42,19 @@ def normalize_phone(phone: str) -> str:
     return "+" + digits
 
 
-# -------------------------------
-# DATABASE INIT (SAFE FOR RENDER)
-# -------------------------------
+# --------------------------------
+# DATABASE INIT (SAFE)
+# --------------------------------
 def ensure_database() -> None:
     try:
         print("📦 INIT DB")
-
-        DB_PATH.parent.mkdir(parents=True, exist_ok=True)
 
         print("DB PATH:", DB_PATH)
         print("CSV PATH:", CSV_PATH)
 
         if not CSV_PATH.exists():
             print("❌ CSV NOT FOUND:", CSV_PATH)
-            return  # 🔥 NO CRASH
+            return  # 🔥 do NOT crash
 
         df = pd.read_csv(CSV_PATH)
 
@@ -62,7 +63,7 @@ def ensure_database() -> None:
 
         if missing:
             print("❌ CSV missing columns:", missing)
-            return  # 🔥 NO CRASH
+            return
 
         df["normalized_phone"] = df["phone"].astype(str).map(normalize_phone)
 
@@ -86,25 +87,31 @@ def ensure_database() -> None:
         print("🔥 DB ERROR:", e)
 
 
-# -------------------------------
+# --------------------------------
 # STARTUP
-# -------------------------------
+# --------------------------------
 @app.on_event("startup")
 def startup() -> None:
     ensure_database()
 
 
-# -------------------------------
+# --------------------------------
 # HEALTH CHECK
-# -------------------------------
+# --------------------------------
 @app.get("/health")
 def health() -> dict:
-    return {"status": "ok", "db": str(DB_PATH)}
+    return {
+        "status": "ok",
+        "db": str(DB_PATH),
+        "csv": str(CSV_PATH),
+        "db_exists": DB_PATH.exists(),
+        "csv_exists": CSV_PATH.exists(),
+    }
 
 
-# -------------------------------
+# --------------------------------
 # LOOKUP
-# -------------------------------
+# --------------------------------
 @app.get("/v1/lookup", response_model=LookupResponse)
 def lookup(phone: str) -> LookupResponse:
     normalized = normalize_phone(phone)
